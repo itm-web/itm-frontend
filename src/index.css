@@ -1,0 +1,141 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --------------------- Base Layer --------------------- */
+@layer base {
+  :root {
+    /* Color Variables */
+    --background: 0 0% 100%;
+    --foreground: 220 10% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 10% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 10% 15%;
+
+    --primary: 220 10% 15%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 5% 96%;
+    --secondary-foreground: 220 10% 15%;
+
+    --muted: 220 5% 96%;
+    --muted-foreground: 220 5% 45%;
+
+    --accent: 220 5% 92%;
+    --accent-foreground: 220 10% 15%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 5% 90%;
+    --input: 220 5% 90%;
+    --ring: 220 10% 15%;
+
+    --radius: 0.5rem;
+
+    /* Custom tokens */
+    --charcoal: 220 10% 15%;
+    --charcoal-light: 220 8% 25%;
+    --grey-warm: 220 5% 55%;
+    --grey-light: 220 5% 85%;
+    --section-number: 220 5% 92%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  /* Dark mode variables */
+  .dark {
+    --background: 220 10% 10%;
+    --foreground: 0 0% 98%;
+
+    --card: 220 10% 12%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 220 10% 12%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 0 0% 98%;
+    --primary-foreground: 220 10% 15%;
+
+    --secondary: 220 10% 18%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 220 10% 18%;
+    --muted-foreground: 220 5% 65%;
+
+    --accent: 220 10% 18%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 10% 20%;
+    --input: 220 10% 20%;
+    --ring: 0 0% 85%;
+  }
+
+  /* Apply border color using CSS variable */
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  /* Global typography (Brevan-style) */
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont,
+      'Segoe UI', Helvetica, Arial, sans-serif;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* --------------------- Utilities --------------------- */
+@layer utilities {
+  .section-number {
+    font-size: 8rem;
+    @apply font-bold leading-none select-none;
+  }
+
+  @media (min-width: 768px) {
+    .section-number {
+      font-size: 12rem;
+    }
+  }
+
+  .text-balance {
+    text-align: justify;
+  }
+
+  .bg-background {
+    background-color: hsl(var(--background));
+  }
+
+  .text-foreground {
+    color: hsl(var(--foreground));
+  }
+
+  .bg-card {
+    background-color: hsl(var(--card));
+  }
+
+  .text-card-foreground {
+    color: hsl(var(--card-foreground));
+  }
+}
