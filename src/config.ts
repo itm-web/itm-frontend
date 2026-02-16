@@ -1,1 +1,1 @@
-export const BASE_URL = "https://itm-backend.onrender.com";
+export const BASE_URL = "https://itmbackend.onrender.com";
