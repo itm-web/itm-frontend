@@ -2,6 +2,7 @@ import heroImage from "@/assets/hero-skyscraper.jpg";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { BASE_URL } from "@/config";
+import { Eye, EyeOff } from "lucide-react"; // 👈 add this
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -10,13 +11,14 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
 
+  const [showPassword, setShowPassword] = useState(false); // 👈 new state
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      // 🔹 Send login request to Flask backend
       const response = await fetch(`${BASE_URL}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -65,6 +67,7 @@ const LoginPage = () => {
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Username */}
           <div>
             <label className="block text-sm text-slate-300 mb-2 text-left">
               Username
@@ -81,20 +84,33 @@ const LoginPage = () => {
             />
           </div>
 
+          {/* Password with Eye Icon */}
           <div>
             <label className="block text-sm text-slate-300 mb-2 text-left">
               Password
             </label>
-            <input
-              type="password"
-              required
-              value={formData.password}
-              onChange={(e) =>
-                setFormData({ ...formData, password: e.target.value })
-              }
-              placeholder="Enter your password"
-              className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-300 focus:outline-none focus:border-sky-300"
-            />
+
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"} // 👈 toggle
+                required
+                value={formData.password}
+                onChange={(e) =>
+                  setFormData({ ...formData, password: e.target.value })
+                }
+                placeholder="Enter your password"
+                className="w-full px-4 py-3 pr-12 rounded-lg bg-white/10 border border-white/20 text-white placeholder-gray-300 focus:outline-none focus:border-sky-300"
+              />
+
+              {/* Eye Icon */}
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-sky-300"
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
           </div>
 
           {error && <p className="text-red-400 text-sm font-medium">{error}</p>}
