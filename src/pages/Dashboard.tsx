@@ -326,7 +326,7 @@ const Dashboard = () => {
                     dataKey="ts"
                     type="number"
                     scale="time"
-                    domain={["dataMin", "dataMax"]}
+                    domain={[(dataMin: number) => dataMin - 15 * 24 * 60 * 60 * 1000, (dataMax: number) => dataMax + 15 * 24 * 60 * 60 * 1000,]}
                     tick={{ fontSize: 11 }}
                     tickFormatter={(ts) =>
                       new Date(ts).toLocaleDateString("en-US", {
