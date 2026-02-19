@@ -302,7 +302,7 @@ const Dashboard = () => {
               <SummaryItem label="Shares" value={formatValue(summary.shares)} />
               <Divider />
               <SummaryItem
-                label="SHARE PRICE"
+                label="Share Price"
                 value={formatUSD(summary.nav_per_share)}
               />
             </div>
@@ -371,16 +371,16 @@ const Dashboard = () => {
                     dataKey="depositRange"
                     fill="#3b82f6"
                     stroke="#1e40af"
-                    strokeWidth={8}
-                    barSize={35}
+                    strokeWidth={1.5}
+                    barSize={18}
                   />
 
                   <Bar
                     dataKey="withdrawalRange"
                     fill="#ef4444"
                     stroke="#991b1b"
-                    strokeWidth={6}
-                    barSize={25}
+                    strokeWidth={1.5}
+                    barSize={14}
                   />
 
                   <Line
