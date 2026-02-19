@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import { Wallet, Banknote, FileChartColumn } from "lucide-react";
 import itmLogo from "@/assets/logo/black_rlogo.png";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react"; // ✅ (only addition here: useMemo)
 import { BASE_URL } from "@/config";
 
 /* ================= HELPERS ================= */
@@ -125,6 +125,51 @@ const Dashboard = () => {
 
   const initials = getInitials(investorName || username);
 
+  // ✅ ADDED: Monthly data ONLY for the chart (does NOT change chartData)
+  const monthlyChartData = useMemo(() => {
+    const parseMDY = (s: string) => {
+      const [m, d, y] = String(s).split("/");
+      const dt = new Date(Number(y), Number(m) - 1, Number(d));
+      return isNaN(dt.getTime()) ? null : dt;
+    };
+
+    const map = new Map<string, any>();
+
+    for (const row of chartData) {
+      const dt = parseMDY(row.date);
+      if (!dt) continue;
+
+      const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
+      const monthTs = new Date(dt.getFullYear(), dt.getMonth(), 1).getTime();
+
+      const existing = map.get(key);
+
+      if (!existing) {
+        map.set(key, {
+          ts: monthTs, // monthly x-axis value
+          portfolio_value: row.portfolio_value ?? 0, // will become "last in month"
+          depositRange: row.depositRange ?? 0, // summed in month
+          withdrawalRange: row.withdrawalRange ?? 0, // summed in month
+          _last: dt.getTime(),
+        });
+      } else {
+        existing.depositRange += row.depositRange ?? 0;
+        existing.withdrawalRange += row.withdrawalRange ?? 0;
+
+        // keep last portfolio value of the month
+        const t = dt.getTime();
+        if (t >= existing._last) {
+          existing._last = t;
+          existing.portfolio_value = row.portfolio_value ?? existing.portfolio_value;
+        }
+      }
+    }
+
+    return Array.from(map.values())
+      .sort((a, b) => a.ts - b.ts)
+      .map(({ _last, ...rest }) => rest);
+  }, [chartData]);
+
   return (
     <div className="min-h-screen bg-[#e9f0f9] text-[#0f2940] flex flex-col font-sans">
       {/* NAVBAR */}
@@ -194,86 +239,59 @@ const Dashboard = () => {
             </h2>
             <div className="h-[350px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={chartData}>
+                {/* ✅ CHANGED ONLY FOR GRAPH: use monthlyChartData */}
+                <ComposedChart data={monthlyChartData}>
                   <CartesianGrid
                     strokeDasharray="3 3"
                     vertical={false}
                     stroke="#e2e8f0"
                   />
-                  
+
+                  {/* ✅ CHANGED ONLY FOR GRAPH: monthly X axis */}
                   <XAxis
-                    dataKey="date"
+                    dataKey="ts"
+                    type="number"
+                    scale="time"
                     tick={{ fontSize: 11 }}
-                    tickFormatter={(value) => { 
-                      // Parse m/dd/yyyy safely
-                      const parts = String(value).split("/");
-                      if (parts.length !== 3) return "";
-                      
-                      const [m, d, y] = parts;
-                      const dt = new Date(Number(y), Number(m) - 1, Number(d));
-                      if (isNaN(dt.getTime())) return "";
-                      
-                      return dt.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-                    }}
-                    interval={0}
-                    tickLine={false}
-                    axisLine={true}
-                    minTickGap={30}
-                    tick={({ x, y, payload, index }) => { 
-                      // Show month label only when the month changes vs previous tick
-                      const curr = String(payload.value);
-                      const prev = index > 0 ? String((chartData as any[])[index - 1]?.date ?? "") : "";
-                      
-                      const getMonthKey = (s: string) => {
-                        const p = s.split("/");
-                        if (p.length !== 3) return "";
-                        const [m, , yy] = p;
-                        return `${yy}-${m.padStart(2, "0")}`;
-                      };
-                      
-                      const currKey = getMonthKey(curr);
-                      const prevKey = getMonthKey(prev);
-
-                      if (!currKey || currKey === prevKey) return null;
-
-                      // Render the tick label
-                      const [m, d, yy] = curr.split("/");
-                      const dt = new Date(Number(yy), Number(m) - 1, Number(d));
-                      const label = isNaN(dt.getTime())
-                        ? ""
-                        : dt.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-                      
-                      return (
-                        <text x={x} y={y + 10} textAnchor="middle" fontSize={11} fill="#64748b">
-                          {label}
-                        </text>
-                      );
-                    }}
+                    tickFormatter={(ts) =>
+                      new Date(ts).toLocaleDateString("en-US", {
+                        month: "short",
+                        year: "2-digit",
+                      })
+                    }
+                    minTickGap={25}
                   />
-                  
-                  <YAxis 
-                    domain={[0, "auto"]} 
-                    tick={{ fontSize: 11 }} 
-                    tickFormatter={(value) => 
+
+                  <YAxis
+                    domain={[0, "auto"]}
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={(value) =>
                       new Intl.NumberFormat("en-US", {
-                        style: "currency", 
-                        currency: "USD", 
+                        style: "currency",
+                        currency: "USD",
                         maximumFractionDigits: 0,
                       }).format(value)
                     }
-                    />
-                  
+                  />
+
                   <Tooltip
+                    // ✅ small add: keep tooltip date readable even with ts
+                    labelFormatter={(label: any) =>
+                      new Date(Number(label)).toLocaleDateString("en-US", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })
+                    }
                     formatter={(v: any, n: any, props: any) => {
                       const { payload } = props;
                       if (n === "portfolio_value") return [v, "Portfolio"];
-                      if (n === "depositRange")
-                        return [payload.amt_in, "Deposit"];
-                      if (n === "withdrawalRange")
-                        return [payload.amt_out, "Withdrawal"];
+                      if (n === "depositRange") return [payload?.amt_in ?? v, "Deposit"];
+                      if (n === "withdrawalRange") return [payload?.amt_out ?? v, "Withdrawal"];
                       return [v, n];
                     }}
                   />
+
                   <Bar
                     dataKey="depositRange"
                     fill="#3b82f6"
