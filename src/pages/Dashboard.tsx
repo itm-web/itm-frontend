@@ -136,7 +136,7 @@ const Dashboard = () => {
     const map = new Map<string, any>();
 
     for (const row of chartData) {
-      const dt = parseMDY(row.date);
+      const dt = parseMDY(row.Date);
       if (!dt) continue;
 
       const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
