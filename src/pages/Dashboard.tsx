@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import { Wallet, Banknote, FileChartColumn } from "lucide-react";
 import itmLogo from "@/assets/logo/black_rlogo.png";
-import { useEffect, useMemo, useState } from "react"; // ✅ (only addition here: useMemo)
+import { useEffect, useMemo, useState } from "react";
 import { BASE_URL } from "@/config";
 
 /* ================= HELPERS ================= */
@@ -21,6 +21,17 @@ const getInitials = (name: string | undefined) => {
   const parts = name.trim().split(" ");
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[1][0]).toUpperCase();
+};
+
+// ✅ USD formatter
+const formatUSD = (val: any) => {
+  const num = Number(val);
+  if (val === null || val === undefined || isNaN(num)) return val;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(num);
 };
 
 /**
@@ -34,6 +45,34 @@ const formatValue = (val: any) => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 4,
   });
+};
+
+// ✅ Date parser (reusable)
+const parseAnyDate = (v: any): Date | null => {
+  if (!v) return null;
+
+  if (v instanceof Date && !isNaN(v.getTime())) return v;
+
+  if (typeof v === "number") {
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  const s = String(v).trim();
+
+  const isoTry = new Date(s);
+  if (!isNaN(isoTry.getTime())) return isoTry;
+
+  const m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) {
+    const month = Number(m[1]);
+    const day = Number(m[2]);
+    const year = Number(m[3]);
+    const d = new Date(year, month - 1, day);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  return null;
 };
 
 /* ================= COMPONENT ================= */
@@ -54,24 +93,29 @@ const Dashboard = () => {
   const [investorName, setInvestorName] = useState(initialInvestorName);
   const [loading, setLoading] = useState(!initialChart);
 
+  const FORMS_URL = "https://forms.office.com/r/X6NVNvB9xS?origin=lprLink";
+
   const actions = [
     {
       title: "Add Money",
       icon: <Wallet className="h-7 w-7" />,
       bg: "bg-sky-500/10 border-sky-500/30 text-sky-700",
       tooltip: "Deposit funds into your investment account",
+      onClick: () => window.open(FORMS_URL, "_blank", "noopener,noreferrer"),
     },
     {
       title: "Withdraw",
       icon: <Banknote className="h-7 w-7" />,
       bg: "bg-emerald-500/10 border-emerald-500/30 text-emerald-700",
       tooltip: "Withdraw funds to your linked bank account",
+      onClick: () => window.open(FORMS_URL, "_blank", "noopener,noreferrer"),
     },
     {
       title: "Full Report",
       icon: <FileChartColumn className="h-7 w-7" />,
       bg: "bg-indigo-500/10 border-indigo-500/30 text-indigo-700",
       tooltip: "Download your complete investment statement",
+      // leave as-is (no redirect requested)
     },
   ];
 
@@ -125,96 +169,78 @@ const Dashboard = () => {
 
   const initials = getInitials(investorName || username);
 
-  // ✅ ADDED: Monthly data ONLY for the chart (does NOT change chartData)
+  // ✅ Last updated = latest date in chartData
+  const lastUpdated = useMemo(() => {
+    const dates = (chartData || [])
+      .map((r) => parseAnyDate(r?.Date ?? r?.date))
+      .filter(Boolean) as Date[];
+
+    if (!dates.length) return "";
+
+    const maxTs = Math.max(...dates.map((d) => d.getTime()));
+    const d = new Date(maxTs);
+
+    return d.toLocaleDateString("en-US", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  }, [chartData]);
+
+  // ✅ Monthly data ONLY for the chart (does NOT change chartData)
   const monthlyChartData = useMemo(() => {
-  const parseAnyDate = (v: any): Date | null => {
-    if (!v) return null;
+    const getNum = (row: any, keys: string[]) => {
+      for (const k of keys) {
+        const val = row?.[k];
+        const n = Number(val);
+        if (val !== undefined && val !== null && !isNaN(n)) return n;
+      }
+      return 0;
+    };
 
-    // If it’s already a Date object
-    if (v instanceof Date && !isNaN(v.getTime())) return v;
+    const map = new Map<string, any>();
 
-    // If it's a number (timestamp)
-    if (typeof v === "number") {
-      const d = new Date(v);
-      return isNaN(d.getTime()) ? null : d;
-    }
+    for (const row of chartData) {
+      const dt = parseAnyDate(row.Date ?? row.date);
+      if (!dt) continue;
 
-    const s = String(v).trim();
+      const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
+      const monthTs = new Date(dt.getFullYear(), dt.getMonth(), 1).getTime();
 
-    // ISO or yyyy-mm-dd or full datetime strings
-    const isoTry = new Date(s);
-    if (!isNaN(isoTry.getTime())) return isoTry;
+      const portfolio = getNum(row, ["portfolio_value", "Investor Value", "investor_value"]);
+      const dep = getNum(row, ["depositRange", "amt_in", "Amount in USD", "amount_in_usd"]);
+      const wd = getNum(row, ["withdrawalRange", "amt_out", "Amount out USD", "amount_out_usd"]);
 
-    // m/dd/yyyy (or with time appended)
-    const m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-    if (m) {
-      const month = Number(m[1]);
-      const day = Number(m[2]);
-      const year = Number(m[3]);
-      const d = new Date(year, month - 1, day);
-      return isNaN(d.getTime()) ? null : d;
-    }
+      const existing = map.get(key);
 
-    return null;
-  };
+      if (!existing) {
+        map.set(key, {
+          ts: monthTs,
+          portfolio_value: portfolio,
+          depositRange: dep,
+          withdrawalRange: wd,
+          amt_in: dep,
+          amt_out: wd,
+          _last: dt.getTime(),
+        });
+      } else {
+        existing.depositRange += dep;
+        existing.withdrawalRange += wd;
+        existing.amt_in += dep;
+        existing.amt_out += wd;
 
-  const getNum = (row: any, keys: string[]) => {
-    for (const k of keys) {
-      const val = row?.[k];
-      const n = Number(val);
-      if (val !== undefined && val !== null && !isNaN(n)) return n;
-    }
-    return 0;
-  };
-
-  const map = new Map<string, any>();
-
-  for (const row of chartData) {
-    // ✅ IMPORTANT: your data uses "Date" (capital D)
-    const dt = parseAnyDate(row.Date ?? row.date);
-    if (!dt) continue;
-
-    const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
-    const monthTs = new Date(dt.getFullYear(), dt.getMonth(), 1).getTime();
-
-    // These fallbacks make it work with your excel-style columns too
-    const portfolio = getNum(row, ["portfolio_value", "Investor Value", "investor_value"]);
-    const dep = getNum(row, ["depositRange", "amt_in", "Amount in USD", "amount_in_usd"]);
-    const wd = getNum(row, ["withdrawalRange", "amt_out", "Amount out USD", "amount_out_usd"]);
-
-    const existing = map.get(key);
-
-    if (!existing) {
-      map.set(key, {
-        ts: monthTs,
-        // keep the same keys your chart uses:
-        portfolio_value: portfolio,
-        depositRange: dep,
-        withdrawalRange: wd,
-        // keep these for your Tooltip logic:
-        amt_in: dep,
-        amt_out: wd,
-        _last: dt.getTime(),
-      });
-    } else {
-      existing.depositRange += dep;
-      existing.withdrawalRange += wd;
-      existing.amt_in += dep;
-      existing.amt_out += wd;
-
-      // last portfolio value in the month
-      const t = dt.getTime();
-      if (t >= existing._last) {
-        existing._last = t;
-        existing.portfolio_value = portfolio || existing.portfolio_value;
+        const t = dt.getTime();
+        if (t >= existing._last) {
+          existing._last = t;
+          existing.portfolio_value = portfolio || existing.portfolio_value;
+        }
       }
     }
-  }
 
-  return Array.from(map.values())
-    .sort((a, b) => a.ts - b.ts)
-    .map(({ _last, ...rest }) => rest);
-}, [chartData]);
+    return Array.from(map.values())
+      .sort((a, b) => a.ts - b.ts)
+      .map(({ _last, ...rest }) => rest);
+  }, [chartData]);
 
   return (
     <div className="min-h-screen bg-[#e9f0f9] text-[#0f2940] flex flex-col font-sans">
@@ -252,28 +278,32 @@ const Dashboard = () => {
           {/* TOP SUMMARY */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-6">
             <div>
-              <h1 className="text-3xl font-bold">Welcome, {username}</h1>
+              {/* ✅ Welcome uses investor sheet name */}
+              <h1 className="text-3xl font-bold">Welcome, {investorName || username}</h1>
+
+              {/* ✅ Last updated uses latest date from chartData */}
               <p className="text-sm text-[#5a6d85] mt-1">
-                Last Logged In: {last_login}
+                Last Updated: {lastUpdated || last_login}
               </p>
             </div>
+
             <div className="flex flex-wrap gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
               <SummaryItem
                 label="Current Equity"
-                value={formatValue(summary.current_equity)}
+                value={formatUSD(summary.current_equity)}
                 isPrimary
               />
               <Divider />
               <SummaryItem
                 label="Total Deposits"
-                value={formatValue(summary.deposits)}
+                value={formatUSD(summary.deposits)}
               />
               <Divider />
               <SummaryItem label="Shares" value={formatValue(summary.shares)} />
               <Divider />
               <SummaryItem
-                label="NAV / Share"
-                value={formatValue(summary.nav_per_share)}
+                label="SHARE PRICE"
+                value={formatUSD(summary.nav_per_share)}
               />
             </div>
           </div>
@@ -285,7 +315,6 @@ const Dashboard = () => {
             </h2>
             <div className="h-[350px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                {/* ✅ CHANGED ONLY FOR GRAPH: use monthlyChartData */}
                 <ComposedChart data={monthlyChartData}>
                   <CartesianGrid
                     strokeDasharray="3 3"
@@ -293,22 +322,22 @@ const Dashboard = () => {
                     stroke="#e2e8f0"
                   />
 
-                  {/* ✅ CHANGED ONLY FOR GRAPH: monthly X axis */}
-                 <XAxis
-                   dataKey="ts"
-                   type="number"
-                   scale="time"
-                   domain={["dataMin", "dataMax"]}   // ← IMPORTANT
-                   tick={{ fontSize: 11 }}
-                   tickFormatter={(ts) =>
-                     new Date(ts).toLocaleDateString("en-US", {
-                       month: "short",
-                       year: "2-digit",
-                     })
-                   }
-                   interval="preserveStartEnd"
-                   minTickGap={40}
-                   />
+                  <XAxis
+                    dataKey="ts"
+                    type="number"
+                    scale="time"
+                    domain={["dataMin", "dataMax"]}
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={(ts) =>
+                      new Date(ts).toLocaleDateString("en-US", {
+                        month: "short",
+                        year: "2-digit",
+                      })
+                    }
+                    interval="preserveStartEnd"
+                    minTickGap={40}
+                  />
+
                   <YAxis
                     domain={[0, "auto"]}
                     tick={{ fontSize: 11 }}
@@ -322,7 +351,6 @@ const Dashboard = () => {
                   />
 
                   <Tooltip
-                    // ✅ small add: keep tooltip date readable even with ts
                     labelFormatter={(label: any) =>
                       new Date(Number(label)).toLocaleDateString("en-US", {
                         day: "2-digit",
@@ -344,18 +372,15 @@ const Dashboard = () => {
                     fill="#3b82f6"
                     stroke="#1e40af"
                     strokeWidth={8}
-                    barSize={35} // Increased overall thickness
-                    // radius={[2, 2, 2, 2]}
+                    barSize={35}
                   />
 
-                  {/* Withdrawal Range (Red) */}
                   <Bar
                     dataKey="withdrawalRange"
                     fill="#ef4444"
                     stroke="#991b1b"
                     strokeWidth={6}
                     barSize={25}
-                    // radius={[2, 2, 2, 2]}
                   />
 
                   <Line
@@ -376,6 +401,7 @@ const Dashboard = () => {
               <div
                 key={idx}
                 title={action.tooltip}
+                onClick={action.onClick}
                 className={`flex items-center gap-4 p-5 rounded-2xl border cursor-pointer transition-all hover:shadow-md ${action.bg}`}
               >
                 <div className="p-3 bg-white/50 rounded-xl shadow-sm">
