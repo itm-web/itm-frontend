@@ -298,13 +298,17 @@ const Dashboard = () => {
                    dataKey="ts"
                    type="number"
                    scale="time"
+                   domain={["dataMin", "dataMax"]}   // ← IMPORTANT
                    tick={{ fontSize: 11 }}
                    tickFormatter={(ts) =>
-                     new Date(ts).toLocaleDateString("en-US", { month: "short", year: "2-digit" })
+                     new Date(ts).toLocaleDateString("en-US", {
+                       month: "short",
+                       year: "2-digit",
+                     })
                    }
-                   minTickGap={25}
+                   interval="preserveStartEnd"
+                   minTickGap={40}
                    />
-
                   <YAxis
                     domain={[0, "auto"]}
                     tick={{ fontSize: 11 }}
