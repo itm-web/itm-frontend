@@ -201,19 +201,55 @@ const Dashboard = () => {
                     stroke="#e2e8f0"
                   />
                   
-                  <XAxis 
+                  <XAxis
                     dataKey="date"
                     tick={{ fontSize: 11 }}
-                    tickFormatter={(value) => {
-                      const [month, day, year] = value.split("/");
-                      const date = new Date(Number(year), Number(month) - 1, Number(day));
-                      return date.toLocaleDateString("en-US", {
-                        month: "short", 
-                        year: "2-digit",
-                      });
+                    tickFormatter={(value) => { 
+                      // Parse m/dd/yyyy safely
+                      const parts = String(value).split("/");
+                      if (parts.length !== 3) return "";
+                      
+                      const [m, d, y] = parts;
+                      const dt = new Date(Number(y), Number(m) - 1, Number(d));
+                      if (isNaN(dt.getTime())) return "";
+                      
+                      return dt.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
                     }}
-                    interval="preserveStartEnd"
-                    />
+                    interval={0}
+                    tickLine={false}
+                    axisLine={true}
+                    minTickGap={30}
+                    tick={({ x, y, payload, index }) => { 
+                      // Show month label only when the month changes vs previous tick
+                      const curr = String(payload.value);
+                      const prev = index > 0 ? String((chartData as any[])[index - 1]?.date ?? "") : "";
+                      
+                      const getMonthKey = (s: string) => {
+                        const p = s.split("/");
+                        if (p.length !== 3) return "";
+                        const [m, , yy] = p;
+                        return `${yy}-${m.padStart(2, "0")}`;
+                      };
+                      
+                      const currKey = getMonthKey(curr);
+                      const prevKey = getMonthKey(prev);
+
+                      if (!currKey || currKey === prevKey) return null;
+
+                      // Render the tick label
+                      const [m, d, yy] = curr.split("/");
+                      const dt = new Date(Number(yy), Number(m) - 1, Number(d));
+                      const label = isNaN(dt.getTime())
+                        ? ""
+                        : dt.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+                      
+                      return (
+                        <text x={x} y={y + 10} textAnchor="middle" fontSize={11} fill="#64748b">
+                          {label}
+                        </text>
+                      );
+                    }}
+                  />
                   
                   <YAxis 
                     domain={[0, "auto"]} 
