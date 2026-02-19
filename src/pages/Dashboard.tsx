@@ -200,8 +200,33 @@ const Dashboard = () => {
                     vertical={false}
                     stroke="#e2e8f0"
                   />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                  <YAxis domain={[0, "auto"]} tick={{ fontSize: 11 }} />
+                  
+                  <XAxis 
+                    dataKey="date"
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={(value) => {
+                      const [month, day, year] = value.split("/");
+                      const date = new Date(Number(year), Number(month) - 1, Number(day));
+                      return date.toLocaleDateString("en-US", {
+                        month: "short", 
+                        year: "2-digit",
+                      });
+                    }}
+                    interval="preserveStartEnd"
+                    />
+                  
+                  <YAxis 
+                    domain={[0, "auto"]} 
+                    tick={{ fontSize: 11 }} 
+                    tickFormatter={(value) => 
+                      new Intl.NumberFormat("en-US", {
+                        style: "currency", 
+                        currency: "USD", 
+                        maximumFractionDigits: 0,
+                      }).format(value)
+                    }
+                    />
+                  
                   <Tooltip
                     formatter={(v: any, n: any, props: any) => {
                       const { payload } = props;
