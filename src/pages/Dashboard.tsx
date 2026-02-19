@@ -127,48 +127,94 @@ const Dashboard = () => {
 
   // ✅ ADDED: Monthly data ONLY for the chart (does NOT change chartData)
   const monthlyChartData = useMemo(() => {
-    const parseMDY = (s: string) => {
-      const [m, d, y] = String(s).split("/");
-      const dt = new Date(Number(y), Number(m) - 1, Number(d));
-      return isNaN(dt.getTime()) ? null : dt;
-    };
+  const parseAnyDate = (v: any): Date | null => {
+    if (!v) return null;
 
-    const map = new Map<string, any>();
+    // If it’s already a Date object
+    if (v instanceof Date && !isNaN(v.getTime())) return v;
 
-    for (const row of chartData) {
-      const dt = parseMDY(row.Date);
-      if (!dt) continue;
-
-      const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
-      const monthTs = new Date(dt.getFullYear(), dt.getMonth(), 1).getTime();
-
-      const existing = map.get(key);
-
-      if (!existing) {
-        map.set(key, {
-          ts: monthTs, // monthly x-axis value
-          portfolio_value: row.portfolio_value ?? 0, // will become "last in month"
-          depositRange: row.depositRange ?? 0, // summed in month
-          withdrawalRange: row.withdrawalRange ?? 0, // summed in month
-          _last: dt.getTime(),
-        });
-      } else {
-        existing.depositRange += row.depositRange ?? 0;
-        existing.withdrawalRange += row.withdrawalRange ?? 0;
-
-        // keep last portfolio value of the month
-        const t = dt.getTime();
-        if (t >= existing._last) {
-          existing._last = t;
-          existing.portfolio_value = row.portfolio_value ?? existing.portfolio_value;
-        }
-      }
+    // If it's a number (timestamp)
+    if (typeof v === "number") {
+      const d = new Date(v);
+      return isNaN(d.getTime()) ? null : d;
     }
 
-    return Array.from(map.values())
-      .sort((a, b) => a.ts - b.ts)
-      .map(({ _last, ...rest }) => rest);
-  }, [chartData]);
+    const s = String(v).trim();
+
+    // ISO or yyyy-mm-dd or full datetime strings
+    const isoTry = new Date(s);
+    if (!isNaN(isoTry.getTime())) return isoTry;
+
+    // m/dd/yyyy (or with time appended)
+    const m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (m) {
+      const month = Number(m[1]);
+      const day = Number(m[2]);
+      const year = Number(m[3]);
+      const d = new Date(year, month - 1, day);
+      return isNaN(d.getTime()) ? null : d;
+    }
+
+    return null;
+  };
+
+  const getNum = (row: any, keys: string[]) => {
+    for (const k of keys) {
+      const val = row?.[k];
+      const n = Number(val);
+      if (val !== undefined && val !== null && !isNaN(n)) return n;
+    }
+    return 0;
+  };
+
+  const map = new Map<string, any>();
+
+  for (const row of chartData) {
+    // ✅ IMPORTANT: your data uses "Date" (capital D)
+    const dt = parseAnyDate(row.Date ?? row.date);
+    if (!dt) continue;
+
+    const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
+    const monthTs = new Date(dt.getFullYear(), dt.getMonth(), 1).getTime();
+
+    // These fallbacks make it work with your excel-style columns too
+    const portfolio = getNum(row, ["portfolio_value", "Investor Value", "investor_value"]);
+    const dep = getNum(row, ["depositRange", "amt_in", "Amount in USD", "amount_in_usd"]);
+    const wd = getNum(row, ["withdrawalRange", "amt_out", "Amount out USD", "amount_out_usd"]);
+
+    const existing = map.get(key);
+
+    if (!existing) {
+      map.set(key, {
+        ts: monthTs,
+        // keep the same keys your chart uses:
+        portfolio_value: portfolio,
+        depositRange: dep,
+        withdrawalRange: wd,
+        // keep these for your Tooltip logic:
+        amt_in: dep,
+        amt_out: wd,
+        _last: dt.getTime(),
+      });
+    } else {
+      existing.depositRange += dep;
+      existing.withdrawalRange += wd;
+      existing.amt_in += dep;
+      existing.amt_out += wd;
+
+      // last portfolio value in the month
+      const t = dt.getTime();
+      if (t >= existing._last) {
+        existing._last = t;
+        existing.portfolio_value = portfolio || existing.portfolio_value;
+      }
+    }
+  }
+
+  return Array.from(map.values())
+    .sort((a, b) => a.ts - b.ts)
+    .map(({ _last, ...rest }) => rest);
+}, [chartData]);
 
   return (
     <div className="min-h-screen bg-[#e9f0f9] text-[#0f2940] flex flex-col font-sans">
@@ -248,19 +294,16 @@ const Dashboard = () => {
                   />
 
                   {/* ✅ CHANGED ONLY FOR GRAPH: monthly X axis */}
-                  <XAxis
-                    dataKey="ts"
-                    type="number"
-                    scale="time"
-                    tick={{ fontSize: 11 }}
-                    tickFormatter={(ts) =>
-                      new Date(ts).toLocaleDateString("en-US", {
-                        month: "short",
-                        year: "2-digit",
-                      })
-                    }
-                    minTickGap={25}
-                  />
+                 <XAxis
+                   dataKey="ts"
+                   type="number"
+                   scale="time"
+                   tick={{ fontSize: 11 }}
+                   tickFormatter={(ts) =>
+                     new Date(ts).toLocaleDateString("en-US", { month: "short", year: "2-digit" })
+                   }
+                   minTickGap={25}
+                   />
 
                   <YAxis
                     domain={[0, "auto"]}
